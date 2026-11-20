@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2A3D66">
+<title>We Help! Board</title>
+<link href="fonts/poppins.css" rel="stylesheet">
+<link href="css/board.css" rel="stylesheet">
+</head>
+<body>
+<div id="viewport">
+<div id="stage" aria-live="polite">
+
+<header>
+  <div class="brand" aria-label="DREAMS">
+    <div class="shapes" aria-hidden="true">
+      <div class="kid"><div class="head"></div><div class="sq"></div></div>
+      <div class="kid"><div class="head"></div><div class="ci"></div></div>
+      <div class="kid"><div class="head"></div><div class="tr"></div></div>
+    </div>
+    <div class="wordmark" aria-hidden="true"><span>D</span><span>R</span><span>E</span><span>A</span><span>M</span><span>S</span></div>
+    <div class="divider"></div>
+  </div>
+  <div class="titles">
+    <p class="eyebrow" id="eyebrow"></p>
+    <h1 id="title"></h1>
+  </div>
+  <div class="cues" aria-label="Look, Point, Say, Move">
+    <span class="bi"><b>Look</b><i>Mira</i></span><em></em><span class="bi"><b>Point</b><i>Señala</i></span><em></em><span class="bi"><b>Say</b><i>Di</i></span><em></em><span class="bi"><b>Move</b><i>Muévete</i></span>
+  </div>
+  <div class="sparkle" aria-hidden="true">
+    <svg width="40" height="40" viewBox="0 0 24 24"><path d="M12 2l2.6 6.9L22 9.3l-5.7 4.6L18.2 21 12 17.2 5.8 21l1.9-7.1L2 9.3l7.4-.4z" fill="#FFC20E"/></svg>
+    <svg width="24" height="24" viewBox="0 0 24 24" style="margin-top:26px"><path d="M12 2l2.6 6.9L22 9.3l-5.7 4.6L18.2 21 12 17.2 5.8 21l1.9-7.1L2 9.3l7.4-.4z" fill="none" stroke="#E63946" stroke-width="2.4" stroke-linejoin="round"/></svg>
+  </div>
+</header>
+
+<main>
+  <section id="board" aria-label="We Help! lesson board"></section>
+  <aside aria-label="Lesson flow checklist">
+    <h2>Lesson flow<small id="asideSub"></small></h2>
+    <div class="progress"><span id="ptext"></span><div class="bar"><i id="pbar"></i></div></div>
+    <ol id="list"></ol>
+    <div class="ctrls">
+      <button class="btn next" id="next" type="button">✓&nbsp; Done — next</button>
+      <button class="btn ghost" id="back" type="button">← Back</button>
+      <button class="btn ghost" id="reset" type="button">↺ Reset</button>
+    </div>
+    <div class="keys"><kbd>Enter</kbd> open box · <kbd>B</kbd> back to board · <kbd>N</kbd> notes · <kbd>F</kbd> full screen</div>
+  </aside>
+</main>
+
+<footer>
+  <span id="footL"></span>
+  <span id="footR"></span>
+</footer>
+
+<div id="notes" role="note"><span class="tag">HELPER NOTES</span><h3 id="nt"></h3><div id="nb"></div></div>
+
+<div id="finale"><div class="fin">
+  <h2 class="bi"><b>We did it!</b><i>¡Lo logramos!</i></h2>
+  <div class="anchor bi"><b>We help!</b><i>¡Ayudamos!</i></div>
+</div></div>
+
+</div>
+</div>
+
+<script src="js/vendor/supabase-2.119.1.js"></script>
+<script src="js/config.js"></script>
+<script src="js/board-content.js"></script>
+<script src="js/board.js"></script>
+<script src="js/board-link.js"></script>
+</body>
+</html>

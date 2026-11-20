@@ -1,0 +1,13 @@
+{
+  "name": "we-help-pilot",
+  "private": true,
+  "description": "DREAMS We Help! pilot: classroom board, teacher portal, Supabase sync",
+  "scripts": {
+    "serve": "python3 -m http.server -d site 8010",
+    "test": "node --test tests/*.test.js",
+    "test:rls": "node tests/supabase-rls.mjs $(supabase status -o env | grep -E '^API_URL=' | cut -d= -f2- | tr -d '\"') $(supabase status -o env | grep -E '^ANON_KEY=' | cut -d= -f2- | tr -d '\"') supabase/.dev-users.local.json"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "2.119.1"
+  }
+}

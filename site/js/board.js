@@ -33,7 +33,7 @@
 
   // ---------- state ----------
   function freshGame(){ return { phase:'intro', place:null, pending:null, signal:null, rot:0, spinning:false, round:[] }; }
-  function fresh(){ return { cur:1, notes:false, introPart:'attend', dateShown:false, here:0, total:0, bb:null, game:freshGame(),
+  function fresh(){ return { cur:1, notes:false, flow:true, word:0, letter:0, introPart:'attend', dateShown:false, here:0, total:0, bb:null, game:freshGame(),
     level:null, levelLog:[], page:0, seq:{placed:[], checked:false, shuffle:[]} }; }
   var state = fresh();
   try{ var s = JSON.parse(localStorage.getItem(KEY)||'null'); if(s && typeof s.cur==='number'){ for(var k in state) if(s[k]!==undefined) state[k]=s[k]; } }catch(e){}
@@ -42,7 +42,7 @@
   if(state.game.spinning){ state.game.spinning = false; state.game.place = state.game.pending; state.game.pending = null; }   // reloaded mid-spin
   var chan = null; try{ chan = new BroadcastChannel('wehelp-board'); }catch(e){}
   function snapshot(){ var g = state.game;
-    return {cur:state.cur, open:typeof pres!=='undefined' && pres.mode!=='overview', date:D.label, dateShown:state.dateShown, introPart:state.introPart,
+    return {cur:state.cur, flow:state.flow!==false, word:state.word, letter:state.letter, open:typeof pres!=='undefined' && pres.mode!=='overview', date:D.label, dateShown:state.dateShown, introPart:state.introPart,
       here:state.here, total:state.total, bb:state.bb, phase:g.phase, place:g.place, signal:g.signal, spinning:g.spinning, round:g.round,
       level:state.level, page:state.page, seq:{placed:state.seq.placed, checked:state.seq.checked}}; }
   function announce(){ var snap = snapshot(); if(chan) chan.postMessage({type:'state', state:snap}); try{ window.dispatchEvent(new CustomEvent('wehelp-board-state', {detail:snap})); }catch(e){} }
@@ -50,6 +50,7 @@
 
   // ---------- icons ----------
   var PIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="9.5" r="2"/><path d="M21 16l-5.5-5.5L5 20"/></svg>';
+  var SPEAKER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18.3 6.5a7.5 7.5 0 0 1 0 11"/></svg>';
   var PERSON = '<svg viewBox="0 0 24 32" aria-hidden="true"><circle cx="12" cy="7.5" r="6"/><path d="M1.5 31.5c0-7.5 4.7-12.5 10.5-12.5s10.5 5 10.5 12.5z"/></svg>';
   var ICON = {
     breath:'<svg viewBox="0 0 24 24" fill="none" stroke="#3FA35B" stroke-width="2" stroke-linecap="round"><path d="M3 9h11a3 3 0 1 0-3-3"/><path d="M3 14h15a3 3 0 1 1-3 3"/><path d="M3 19h6"/></svg>',
@@ -118,15 +119,16 @@
         + '<button class="hub" type="button" data-act="spin">'+bi('SPIN', 'GIRA')+'</button></div></div><div class="mv-now" id="mvNow"></div></div>'
         + '</div>';
     },
+    // Word wall and Letters: a vertical list on the left, the highlighted item as a big card on the right
     wall: function(){
-      return '<img class="pep-head" src="img/pep-head.png" alt=""><div class="wall">'
-        + C.words.map(function(w){ return '<div class="wd">'+media(w.img, w.en)+bi(w.en, w.es, 'wd-w')+bi(w.gesture, w.gestureEs, 'gs')+'</div>'; }).join('')
-        + '</div>';
+      return '<img class="pep-head" src="img/pep-head.png" alt=""><div class="wl" id="wall"><ol class="wl-list">'
+        + C.words.map(function(w, i){ return '<li data-act="word" data-i="'+i+'"><span class="n">'+(i+1)+'</span>'+bi(w.en, w.es)+'</li>'; }).join('')
+        + '</ol><div class="wl-card" id="wallCard"></div></div>';
     },
     pep: function(){
-      return '<img class="pep-head" src="img/pep-head.png" alt=""><div class="ltrs">'
-        + C.letters.map(function(l){ return '<div class="ltr" style="--lc:'+l.color+'"><b class="L">'+l.L+'<span>'+l.L.toLowerCase()+'</span></b>'+media(l.img, l.word, l.color)+bi(l.word, l.es)+'</div>'; }).join('')
-        + '</div>';
+      return '<img class="pep-head" src="img/pep-head.png" alt=""><div class="wl ltr-wl" id="ltrs"><ol class="wl-list">'
+        + C.letters.map(function(l, i){ return '<li data-act="letter" data-i="'+i+'" style="--lc:'+l.color+'"><b class="L">'+l.L+'<span>'+l.L.toLowerCase()+'</span></b>'+bi(l.word, l.es)+'</li>'; }).join('')
+        + '</ol><div class="wl-card" id="ltrCard"></div></div>';
     },
     read: function(){
       return '<div class="rd"><div class="cover-ph" id="rdCover"></div><div class="rd-side"><div class="start" id="rdStart"></div><div class="lvls">'
@@ -207,6 +209,21 @@
       + (g.signal==='stop' ? '<div class="stopov"><div class="oct">'+bi('STOP', '¡PARA!')+'</div><div class="freeze">'+bi('Freeze!', '¡Congélate!')+'<span class="cd"><em>3</em><em>2</em><em>1</em></span></div></div>' : '')
       + '</div>';
   }
+  var lastWall = null, lastLtr = null;
+  function speakBtn(text){ return '<button class="speak" type="button" data-act="say" data-say="'+esc(text)+'" aria-label="Say '+esc(text)+'">'+SPEAKER+bi('Listen', 'Escucha')+'</button>'; }
+  function renderWall(){
+    var i = clampI(state.word, C.words.length), w = C.words[i];
+    $$('#wall .wl-list li').forEach(function(li){ var k = +li.dataset.i; li.classList.toggle('on', k===i); li.classList.toggle('seen', k<i); });
+    if(lastWall===i) return; lastWall = i;
+    $('#wallCard').innerHTML = '<div class="wc">'+media(w.img, w.en)+bi(w.en, w.es, 'wc-w')+speakBtn(w.en)+'</div>';
+  }
+  function renderLetters(){
+    var i = clampI(state.letter, C.letters.length), l = C.letters[i];
+    $$('#ltrs .wl-list li').forEach(function(li){ var k = +li.dataset.i; li.classList.toggle('on', k===i); li.classList.toggle('seen', k<i); });
+    if(lastLtr===i) return; lastLtr = i;
+    $('#ltrCard').innerHTML = '<div class="wc" style="--lc:'+l.color+'"><b class="L">'+l.L+'<span>'+l.L.toLowerCase()+'</span></b>'+media(l.img, l.word, l.color)+bi(l.word, l.es, 'wc-w')+speakBtn(l.L+'. '+l.word)+'</div>';
+  }
+  function clampI(i, n){ i = +i||0; return Math.max(0, Math.min(n-1, i)); }
   function reader(){ return C.readers[state.level||1]; }
   function renderRead(){
     var L = state.level, r = reader();
@@ -268,7 +285,7 @@
     var b = boxAt(state.cur), nd = b && C.notes[b.id];
     if(nd){ $('#nt').textContent = nd[0]; $('#nb').textContent = nd[1]; }
     notes.classList.toggle('show', state.notes && !!nd && !finished);
-    renderIntro(); renderToday(); renderReady(); renderMove(); renderRead(); renderComp();
+    renderIntro(); renderToday(); renderReady(); renderMove(); renderWall(); renderLetters(); renderRead(); renderComp(); renderFlow();
     save();
   }
 
@@ -311,6 +328,31 @@
     if(g.round.indexOf(i)<0) g.round.push(i); if(g.round.length>=NP) g.round = [];
     renderMove(); save(); }
   function signal(s){ var g = state.game; if(g.spinning || g.place==null) return; g.signal = ['go','move','stop'].indexOf(s)>=0 ? s : null; renderMove(); save(); }
+  // Word wall / Letters: one item at a time
+  function setWord(i){ state.word = clampI(i, C.words.length); renderWall(); save(); }
+  function setLetter(i){ state.letter = clampI(i, C.letters.length); renderLetters(); save(); }
+  // Say a word aloud in English on the board computer (speech built into the browser; no audio files needed)
+  function say(text){
+    try{ var sp = window.speechSynthesis; if(!sp || !text) return;
+      sp.cancel(); var u = new SpeechSynthesisUtterance(String(text)); u.lang = 'en-US'; u.rate = .8;
+      var vs = sp.getVoices().filter(function(v){ return /^en[-_]US/i.test(v.lang); });
+      var pick = vs.filter(function(v){ return /Samantha|Google US English|Aria|Jenny/i.test(v.name); })[0] || vs[0]; if(pick) u.voice = pick;
+      $$('.speak').forEach(function(b){ b.classList.add('talking'); });
+      u.onend = u.onerror = function(){ $$('.speak').forEach(function(b){ b.classList.remove('talking'); }); };
+      sp.speak(u);
+    }catch(e){} }
+  try{ if(window.speechSynthesis){ speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = function(){ speechSynthesis.getVoices(); }; } }catch(e){}   // Chrome loads voices late
+  function sayCurrent(){ var b = boxAt(state.cur), id = b && b.id;
+    if(id==='pep'){ var l = C.letters[clampI(state.letter, C.letters.length)]; say(l.L+'. '+l.word); }
+    else { say(C.words[clampI(state.word, C.words.length)].en); } }
+  // Lesson flow sidebar on/off (off = the boxes use the full width while presenting)
+  function setFlow(on){ state.flow = on===undefined ? state.flow===false : !!on; renderFlow(); save(); }
+  function renderFlow(){
+    var off = state.flow===false, st = $('#stage'); $('#flowBtn').setAttribute('aria-pressed', String(!off));
+    if(st.classList.contains('noflow')===off) return;
+    st.classList.toggle('noflow', off);
+    if(pres.mode==='expanded' && pres.el){ var el = pres.el; el.style.transition = 'none'; setBox(el, stageInner()); expandedBody(el); void el.offsetWidth; el.style.transition = ''; }
+  }
   function setLevel(L, source){ L = L ? Math.max(1, Math.min(3, +L)) : null; if(L===state.level) return;
     state.levelLog.push({at:new Date().toISOString(), from:state.level, to:L, source:source||'board'});
     state.level = L; state.page = 0; state.seq = {placed:[], checked:false, shuffle:[]}; render(); }
@@ -332,6 +374,9 @@
       if(act==='bb'){ setBrainBreak(a.dataset.id); return; }
       if(act==='bbclear'){ setBrainBreak(null); return; }
       if(act==='spin'){ spin(); return; }
+      if(act==='word'){ setWord(+a.dataset.i); return; }
+      if(act==='letter'){ setLetter(+a.dataset.i); return; }
+      if(act==='say'){ say(a.dataset.say); return; }
       if(act==='level'){ setLevel(+a.dataset.l===state.level?null:+a.dataset.l, 'board'); return; }
       if(act==='seq'){ seqPlace(+a.dataset.k); return; }
       if(act==='unplace'){ seqUnplace(+a.dataset.s); return; }
@@ -341,6 +386,7 @@
   $('#next').onclick = function(){ if(pres.mode==='overview') next(); };
   $('#back').onclick = function(){ if(pres.mode==='overview') back(); };
   $('#reset').onclick = reset;
+  $('#flowBtn').onclick = function(){ setFlow(); };
   items.forEach(function(li){ li.onclick = function(){ if(pres.mode==='overview') jump(+li.dataset.step); }; });
 
   // ---------- present mode: Enter opens the current box full size, B puts it back ----------
@@ -405,6 +451,12 @@
       if(kl==='g'){ signal('go'); return true; } if(kl==='m'){ signal('move'); return true; } if(kl==='s'){ signal('stop'); return true; }
       if(kl==='i'){ gamePhase('intro'); return true; } if(kl==='p'){ gamePhase('play'); return true; } if(kl==='c'){ gamePhase('close'); return true; }
     }
+    if(id==='wall' || id==='pep'){
+      var n = id==='wall' ? C.words.length : C.letters.length, cur = id==='wall' ? state.word : state.letter, set = id==='wall' ? setWord : setLetter;
+      if(num && num<=n){ set(num-1); return true; }
+      if(k==='ArrowDown'||k==='ArrowRight'||k===' '){ set(cur+1); return true; } if(k==='ArrowUp'||k==='ArrowLeft'){ set(cur-1); return true; }
+      if(kl==='s'){ sayCurrent(); return true; }
+    }
     if(id==='read'){
       if(num && num<=3){ setLevel(num, 'board-key'); return true; }
       if(k==='ArrowRight'||k===' '||k==='PageDown'){ turn(1); return true; } if(k==='ArrowLeft'||k==='PageUp'){ turn(-1); return true; }
@@ -421,6 +473,7 @@
     if(k==='Enter'){ e.preventDefault(); if(!e.repeat) expand(); return; }
     if(kl==='b'){ e.preventDefault(); if(!e.repeat) collapse(); return; }
     if(kl==='n' && !e.repeat){ state.notes = !state.notes; render(); return; }
+    if(kl==='l' && !e.shiftKey && !e.repeat){ setFlow(); return; }
     if(pres.mode==='expanded'){ if(!e.repeat && boxKey(e)) e.preventDefault(); return; }
     if(pres.mode!=='overview') return;
     if(k==='ArrowRight'||k===' '||k==='PageDown'){ e.preventDefault(); next(); }
@@ -448,6 +501,7 @@
   var API = { goto:jump, next:next, back:back, open:expand, close:function(){ collapse(false); },
     setAttendance:setAttendance, showDate:showDate, setIntroPart:setIntroPart, setBrainBreak:setBrainBreak,
     gamePhase:gamePhase, spin:spin, setPlace:setPlace, signal:signal,
+    setWord:setWord, setLetter:setLetter, say:say, sayCurrent:sayCurrent, setFlow:setFlow,
     setLevel:setLevel, turn:turn, reset:reset, seqCheck:seqCheck, seqUndo:seqUndo, seqNew:seqNew,
     announce:function(){ announce(); }, getState:function(){ return JSON.parse(JSON.stringify(state)); } };
   window.board = API;

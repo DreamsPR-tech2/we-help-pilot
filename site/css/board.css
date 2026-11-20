@@ -518,3 +518,49 @@ footer b{color:var(--yellow)}
 /* open box: new box bodies fill the height (the generic present rule sets body children to flex:0 0 auto) */
 .panel.presenting .body>.today,.panel.presenting .body>.bb,.panel.presenting .body>.mv,.panel.presenting .body>.wall,.panel.presenting .body>.ltrs{flex:1 1 auto;min-height:0}
 .panel.big .bbt .bi{font-size:14px}
+
+/* ---- Lesson flow switch: off hides the sidebar and gives the boxes the full width ---- */
+header{grid-template-columns:auto 1fr auto auto}
+.flowsw{display:inline-flex;align-items:center;gap:8px;margin-right:84px;border:2px solid var(--line);background:#fff;border-radius:999px;padding:4px 12px 4px 5px;font-weight:700;font-size:13px;color:var(--muted)}
+.flowsw .tr{width:34px;height:20px;border-radius:999px;background:#C9D2DE;position:relative;transition:background .2s}
+.flowsw .tr i{position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s}
+.flowsw[aria-pressed="true"] .tr{background:var(--c2)}
+.flowsw[aria-pressed="true"] .tr i{transform:translateX(14px)}
+.cues{padding-right:0}
+#stage.noflow main{grid-template-columns:1fr 0}
+#stage.noflow aside{display:none}
+#stage.noflow #finale{right:0}
+#stage.noflow #notes{right:28px}
+
+/* ---- 5 Word wall · 6 Letters: list on the left, one item at a time on the right ---- */
+.wl{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.wl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;min-height:0}
+.wl-list li{flex:1;min-height:0;display:flex;align-items:center;gap:8px;padding:0 10px;border:2.5px solid var(--line);border-radius:10px;background:#fff;color:var(--navy);cursor:pointer;transition:all .25s}
+.wl-list .n{flex:none;width:18px;height:18px;border-radius:50%;background:var(--c);color:#fff;display:grid;place-items:center;font-weight:800;font-size:10px}
+.wl-list .bi{flex-direction:row;align-items:baseline;gap:8px;font-size:13px}
+.wl-list .bi>i{font-size:.8em}
+.wl-list .L{font-family:var(--display);font-weight:800;font-size:18px;line-height:1;color:var(--lc);min-width:34px}
+.wl-list .L span{font-size:.75em;margin-left:1px}
+.wl-list li.seen{opacity:.6}
+.wl-list li.on{border-color:var(--c);background:var(--cl);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 30%,transparent);opacity:1}
+.ltr-wl .wl-list li.on{border-color:var(--lc);background:color-mix(in srgb,var(--lc) 10%,#fff);box-shadow:0 0 0 3px color-mix(in srgb,var(--lc) 30%,transparent)}
+.wl-card{display:none;min-height:0;min-width:0}
+.panel.big .wl{grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr);gap:18px;padding-top:4px}
+.panel.big .wl-list{gap:8px}
+.panel.big .wl-list li{border-radius:14px;padding:0 16px;gap:12px;border-width:3px}
+.panel.big .wl-list .bi{flex-direction:column;align-items:flex-start;gap:0;font-size:22px}
+.panel.big .wl-list .n{width:26px;height:26px;font-size:14px}
+.panel.big .wl-list .L{font-size:34px;min-width:64px}
+.panel.big .wl-list li.on{transform:translateX(8px)}
+.panel.big .wl-card{display:flex}
+.wc{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;gap:8px;background:#fff;border:4px solid var(--lc,var(--c));border-radius:22px;padding:12px;animation:popin .45s cubic-bezier(.3,1.5,.4,1) both}
+.wc .phd,.wc .media{flex:1;min-height:0;width:100%;--pc:var(--lc,var(--c))}
+.wc .L{font-family:var(--display);font-weight:800;font-size:64px;line-height:.95;color:var(--lc)}
+.wc .L span{font-size:.7em;margin-left:4px}
+.wc-w{align-items:center;font-family:var(--display);font-size:36px;color:var(--navy);line-height:1.05}
+.speak{display:inline-flex;align-items:center;gap:10px;border:0;border-radius:999px;background:var(--lc,var(--c));color:#fff;padding:6px 18px 6px 10px;font-size:14px;box-shadow:0 4px 0 rgba(0,0,0,.18)}
+.speak svg{width:28px;height:28px}
+.speak .bi>i{opacity:.9}
+.speak:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.18)}
+.speak.talking{animation:pulse .7s ease-in-out infinite}
+.panel[data-box="wall"] .pep-head,.panel[data-box="pep"] .pep-head{display:none}

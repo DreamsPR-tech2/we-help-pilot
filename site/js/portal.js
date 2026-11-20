@@ -387,6 +387,15 @@
         + '<details><summary class="small">Show a place without spinning (a student drew a paper card)</summary><div class="chips" style="margin-top:8px">' + C.places.map(function(p, i){ return '<button type="button" class="chip' + (bs.place === i ? ' on' : '') + '" data-place="' + i + '">' + esc(p.landmark) + '</button>'; }).join('') + '</div></details>'
         + (act.draws.length || act.stops.length ? '<div class="gamelog"><b>Today so far</b> · ' + act.draws.length + ' place' + (act.draws.length === 1 ? '' : 's') + ', ' + act.stops.length + ' stop' + (act.stops.length === 1 ? '' : 's') + '<br>'
             + gameTimeline(act) + '</div>' : '');
+    } else if(box && (box.id === 'wall' || box.id === 'pep')){
+      var isW = box.id === 'wall', items = isW ? C.words : C.letters, at = Math.max(0, Math.min(items.length - 1, (isW ? bs.word : bs.letter) || 0));
+      var cmd = isW ? 'setWord' : 'setLetter', label = function(x){ return isW ? x.en : x.L + x.L.toLowerCase() + ' · ' + x.word; };
+      ctl = '<h3>' + (isW ? 'Word' : 'Letter') + ' ' + (at + 1) + ' of ' + items.length + ': ' + esc(label(items[at])) + '</h3>'
+        + '<div class="chips">' + items.map(function(x, i){ return '<button type="button" class="chip' + (i === at ? ' on' : '') + '" data-cmd="' + cmd + '" data-a="' + i + '">' + (i + 1) + ' · ' + esc(label(x)) + '</button>'; }).join('') + '</div>'
+        + '<div class="row"><button type="button" class="btn" data-cmd="' + cmd + '" data-a="' + Math.max(0, at - 1) + '"' + (at === 0 ? ' disabled' : '') + '>← Previous</button>'
+        + '<button type="button" class="btn pri big" data-cmd="sayCurrent" style="flex:1">Say it on the board</button>'
+        + '<button type="button" class="btn" data-cmd="' + cmd + '" data-a="' + Math.min(items.length - 1, at + 1) + '"' + (at === items.length - 1 ? ' disabled' : '') + '>Next →</button></div>'
+        + '<p class="small muted" style="margin:0">The board computer says the English ' + (isW ? 'word' : 'letter and word') + ' out loud. Its speakers need to be on, and the board needs one click or key press after it opens before the browser allows sound.</p>';
     } else if(box && box.id === 'read'){
       ctl = levelControls(sm, bs) + '<div class="row"><button type="button" class="btn" data-cmd="turn" data-a="-1">← Page</button><button type="button" class="btn" data-cmd="turn" data-a="1">Page →</button></div>';
     } else if(box && box.id === 'comp'){
@@ -399,7 +408,8 @@
       + '<div class="spread"><h2>Lesson</h2><div class="row"><span class="conn' + (conn ? ' on' : '') + '"><i></i>' + (conn ? 'Board connected' : 'Board not open') + '</span><a class="btn" href="board.html" target="wehelp-board">Open board ↗</a></div></div>'
       + (conn ? '' : '<p class="small muted" style="margin:0">Open the board on the classroom TV computer. For now it must be in another tab of this same browser; Phase 4 connects separate devices.</p>')
       + '<div class="boxes">' + C.boxes.map(function(b){ return '<button type="button" class="bx' + (b.n === cur ? ' on' : b.n < cur ? ' done' : '') + '" data-cmd="goto" data-a="' + b.n + '"><i>' + b.n + '</i>' + esc(b.title) + '</button>'; }).join('') + '</div>'
-      + '<div class="row"><button type="button" class="btn" data-cmd="back">← Back</button><button type="button" class="btn' + (bs.open ? '' : ' pri') + '" data-cmd="' + (bs.open ? 'close' : 'open') + '">' + (bs.open ? 'Close box' : 'Open box full size') + '</button><button type="button" class="btn warn" data-cmd="next">Done, next →</button></div>'
+      + '<div class="row"><button type="button" class="btn" data-cmd="back">← Back</button><button type="button" class="btn' + (bs.open ? '' : ' pri') + '" data-cmd="' + (bs.open ? 'close' : 'open') + '">' + (bs.open ? 'Close box' : 'Open box full size') + '</button><button type="button" class="btn warn" data-cmd="next">Done, next →</button>'
+        + '<button type="button" class="btn ghost" data-cmd="setFlow" data-a="' + (bs.flow === false ? 1 : 0) + '">Lesson flow on board: ' + (bs.flow === false ? 'Off' : 'On') + '</button></div>'
       + (ctl ? '<div class="card stack">' + ctl + '</div>' : '')
       + (note ? '<div class="card"><h3>' + esc(note[0]) + '</h3><p class="small" style="margin:6px 0 0">' + esc(note[1]) + '</p></div>' : '')
       + '</div>';

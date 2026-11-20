@@ -53,25 +53,28 @@ Each iPad signs in once with a name and role. The name is saved with every score
 1 Today (Who is here? count · calendar with full weekday names; the iPad picks which fills the open box, or both) · 2 Plan ·
 3 Brain Break (Five-Finger Breathing, Calm Breathing, Notice 3-2-1, March in Place; the teacher picks one) ·
 4 Move together (“Let’s Explore Puerto Rico”: the four places, then spinner left / current place right with GO · MOVE · STOP, then “Who helps here?”) ·
-5 Word wall (help do see go stop + gestures) · 6 Letters (H D S G) · 7 Read together (leveled reader, Level 1–3) · 8 Comprehension (picture sequencing, 2/3/5 pictures by level)
+5 Word wall (help do see go stop) · 6 Letters (H D S G): both a list on the left with one item at a time as a big card on the right, with a speaker button that says the English aloud · 7 Read together (leveled reader, Level 1–3) · 8 Comprehension (picture sequencing, 2/3/5 pictures by level)
 
 Place pictures are placeholders until the art arrives: set `img` on each place in `board-content.js`.
 
 ## Keys
 | Where | Keys |
 |---|---|
-| Board | → / Space next · ← back · 1–7 jump · **Enter** open box · N notes · R reset · F full screen |
+| Board | → / Space next · ← back · 1–8 jump · **Enter** open box · N notes · L lesson flow on/off · R reset · F full screen |
 | Any open box | **B** back to board (moves to the next box) |
 | 1 Today | ←/→ who is here · calendar · both · D fill in or hide the date |
 | 3 Brain Break | 1–4 pick a break · 0 back to all four |
 | 4 Move together | I show the places · P play · C close · W or Space spin · 1–4 show a place · G go · M move · S stop |
+| 5 Word wall · 6 Letters | ↑/↓ (or ←/→, Space) next or previous · 1–5 jump · S say it aloud |
 | 7 Read together | 1–3 set the level (logged as an override) · ←/→ turn pages |
 | 8 Comprehension | 1–5 place a card · Backspace undo · C check · X new order |
 
-Clicks work too: the calendar, brain break cards, the SPIN button, level buttons, sequencing cards.
+The **Lesson flow** switch in the board header (or L, or the portal) hides the sidebar so the boxes use the full width while presenting. Speech uses the voices built into the board computer’s browser; it needs one click or key press on the board after it opens.
+
+Clicks work too: the words and letters, the speaker button, the calendar, brain break cards, the SPIN button, level buttons, sequencing cards.
 
 ## Control API (for the teacher portal)
-`window.board.goto(n) · next() · back() · open() · close() · setAttendance(here, total) · showDate(true|false) · setIntroPart(attend|date|all) · setBrainBreak(id|null) · gamePhase(intro|play|close) · spin(i?) · setPlace(i) · signal('go'|'move'|'stop') · setLevel(1|2|3, source) · turn(±1) · reset() · getState()`
+`window.board.goto(n) · next() · back() · open() · close() · setAttendance(here, total) · showDate(true|false) · setIntroPart(attend|date|all) · setBrainBreak(id|null) · gamePhase(intro|play|close) · spin(i?) · setPlace(i) · signal('go'|'move'|'stop') · setWord(i) · setLetter(i) · say(text) · sayCurrent() · setFlow(true|false) · setLevel(1|2|3, source) · turn(±1) · reset() · getState()`
 The same commands also work over `postMessage({type:'wehelp', cmd, args})`.
 
 ## Supabase setup (real project, before Dec 1)

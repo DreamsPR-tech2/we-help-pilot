@@ -100,13 +100,13 @@ window.WEHELP = {
     { L: 'S', word: 'see',  es: 'ver',   color: '#3FA35B', img: null },
     { L: 'G', word: 'go',   es: 'ir',    color: '#7A4FBF', img: null }
   ],
-  // Box 5. Word wall: the five unit words. Gestures from the Dec 1 game guide (p. 6): use the same one every time.
+  // Box 5. Word wall: the five unit words, one at a time. The speaker button says the English word aloud.
   words: [
-    { en: 'help', es: 'ayuda', gesture: 'Open hands',    gestureEs: 'Manos abiertas',    img: null },
-    { en: 'do',   es: 'hacer', gesture: 'A job action',  gestureEs: 'Una acción de trabajo', img: null },
-    { en: 'see',  es: 'ver',   gesture: 'Point to eyes', gestureEs: 'Señala los ojos',   img: null },
-    { en: 'go',   es: 'ir',    gesture: 'Walk in place', gestureEs: 'Camina en el lugar', img: null },
-    { en: 'stop', es: 'parar', gesture: 'Hand out',      gestureEs: 'Mano al frente',    img: null }
+    { en: 'help', es: 'ayuda', img: null },
+    { en: 'do',   es: 'hacer', img: null },
+    { en: 'see',  es: 'ver',   img: null },
+    { en: 'go',   es: 'ir',    img: null },
+    { en: 'stop', es: 'parar', img: null }
   ],
 
   // Box 7. One leveled reader per level. Page text is placeholder until Kristen's large-print files arrive.
@@ -135,8 +135,8 @@ window.WEHELP = {
     today: ['Plan · 4–5 min · Lizbeth', 'Point to each part of the plan as you name it. Cari starts pulling students for the quick check.'],
     ready: ['Brain Break · 5–7 min · Lizbeth', 'Pick the break that fits the class right now (the iPad shows when each one helps). Show, say one short direction at a time, wait at least 5 seconds. Seated and standing are equal. Never require eye contact or full range of motion. Stop for pain, dizziness, shortness of breath or loss of balance.'],
     move:  ['Move together · 7–22 min · Lizbeth', 'Show the four places first. Then start the game: spin, “First, go to ___.” Do the move together, seated or standing. Hold up STOP: everyone freezes for 3 seconds. The classroom teacher marks each stop on the iPad. A new student spins each time. Close: point to each sign, “Who helps here?”, then “We did it! We help!”'],
-    wall:  ['Word wall · Kristen', 'The five unit words: picture, English, Spanish, gesture. Use the same gesture every time. Whole-class responses.'],
-    pep:   ['Letters · Kristen', 'Letter sounds H, D, S, G, each with its word. Whole-class responses.'],
+    wall:  ['Word wall · Kristen', 'Go through the five words one at a time (↑/↓ or the iPad). Show the picture, press the speaker so everyone hears the English word, then the class says it. Whole-class responses.'],
+    pep:   ['Letters · Kristen', 'Go through H, D, S, G one at a time (↑/↓ or the iPad). Show the letter and picture, press the speaker to hear the letter and its word, then the class says it. Whole-class responses.'],
     read:  ['Read together · Kristen & Cari', 'Shared and echo reading at the class level from the quick check. Level 1: single words. Level 2: short sentences. Level 3: story.'],
     comp:  ['Comprehension · Cari', 'Put the story pictures in order, first to last. The number of pictures follows the class level. Call students on the second-screen list first.']
   }

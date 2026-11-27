@@ -30,8 +30,9 @@ Two modes:
 - `supabase/dev-users.mjs`: creates test accounts on the **local** stack only
 - `tests/supabase-rls.mjs`: checks the access rules against the local stack
 - `site/js/screen-items.js`: Quick Check item wording, rubric and card-mat pictures (edit here when Kristen & Cari approve wording)
-- `site/js/scoring.js`: **Quick Check scoring rules** from Toolkit v2.0 Part 4 (totals, levels, class level, flags,
-  second screen, stop check, CSV export). One file used by the board, portal and report; loads in the browser as
+- `site/js/scoring.js`: **Quick Check scoring rules**: the 9-point primary screen (items 3–7; item 8 bonus not scored),
+  per-item status (Correct / Attempted-incorrect / No response / Not administered), levels 0–3 → 1, 4–6 → 2, 7–9 → 3,
+  teacher level override, class level, flags, second screen, stop check, CSV export. One file used by the board, portal and report; loads in the browser as
   `window.WeHelpScoring` and in Node with `require`.
 - `tests/scoring.test.js`: every test case from the toolkit, plus data-integrity checks
 
@@ -43,7 +44,7 @@ node --test tests/*.test.js
 ## Teacher portal
 Each iPad signs in once with a name and role. The name is saved with every score.
 - **Lesson** (lesson lead): moves the board through boxes 1–8, opens or closes a box, and has per-box controls: attendance (Here / Not here per student; the board shows only the count) and filling in the date; picking the Brain Break (with a hint for when each one helps); the game (show the places, spin, GO / MOVE / STOP, close); reader level, page turns, sequencing check and who to call next. The reader level shows the quick-check recommendation; picking a different level asks for a reason and is logged.
-- **Screen** (screener): roster, then one student, then one item per screen: show/say, 4 big score buttons with the rubric, a 5-second wait timer and the student card mat. Item 1 has toggles for the words missed and fills in the score. A 0 asks why. After that: optional bonus, response mode and engaged yes/no, then Save. A missing item is never a zero, and Save stays off until all 5 are scored. The summary shows the total, target, level and flags. **Second screen** shows only the flagged items (Level 1–2, scored 0–1).
+- **Screen** (screener): roster, then one student, then one item per screen (items 3–7, then the item 8 bonus): show/say, a 5-second wait timer and the student card mat. The screener records what happened (words shown, how many words, steps completed and assistance, sound, words of “We help.”, response mode and support) or taps **No response** / **Not administered**; the score and status follow. A 0 asks why; Not administered asks why and stays blank, never 0. After that: response mode and engaged yes/no, then Save. The summary shows the total /9, level, flags and an item table. If an item was not administered there is no automatic level: the teacher picks Level 1–3 and a reason (also possible on any screen). A total of 0 starts at Level 1 and is flagged for review. **Second screen** shows only the flagged items (Level 1–2: item 3 with 0–2 words, items 4–7 scored 0).
 - **Card mat**: full screen, pictures only, shuffled each time; press and hold to close.
 - **Stop check** (classroom teacher): pick 4–5 students to watch, then mark Yes or No per stop. Each STOP the lesson lead presses opens the next stop here, labelled with the place. Per student: Asked for help · Offered help · Used support · Engaged, and a note. Class summary: students with more Yes than No, and what to do tomorrow.
 - **Results**: here today, screened, target met, class level, level counts, stop-check %, second-screen progress, what to do tomorrow, a per-student table, the Brain Break used and the game timeline (places and stops), the reader level log, and the CSV export (no names).
@@ -53,9 +54,9 @@ Each iPad signs in once with a name and role. The name is saved with every score
 1 Today (Who is here? count · calendar with full weekday names; the iPad picks which fills the open box, or both) · 2 Plan ·
 3 Brain Break (Five-Finger Breathing, Calm Breathing, Notice 3-2-1, March in Place; the teacher picks one) ·
 4 Move together (“Let’s Explore Puerto Rico”: the four places, then spinner left / current place right with GO · MOVE · STOP, then “Who helps here?”) ·
-5 Word wall (help do see go stop) · 6 Letters (H D S G): both a list on the left with one item at a time as a big card on the right, with a speaker button that says the English aloud · 7 Read together (leveled reader, Level 1–3) · 8 Comprehension (picture sequencing, 2/3/5 pictures by level)
+5 Word wall (help do see go stop) · 6 Letters (H D S G): both a list on the left with one item at a time as a big card on the right, with a speaker button that says the English aloud · 7 Read together (“The Lost Phone / El teléfono perdido”, Level 1–3, story pages x-03 to x-14 with the book’s page numbers; pictures in `site/img/reader/`) · 8 Comprehension (picture sequencing from the reader, 2/3/5 pictures by level)
 
-Place pictures are placeholders until the art arrives: set `img` on each place in `board-content.js`.
+Place photos (`site/img/place-*.jpg`) come from the game guide v4 “Choose a Place” board.
 
 ## Keys
 | Where | Keys |

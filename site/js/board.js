@@ -227,26 +227,66 @@
   function reader(){ return C.readers[state.level||1]; }
   function renderRead(){
     var L = state.level, r = reader();
-    $('#rdCover').innerHTML = bi(C.unit.title, C.unit.titleEs)+'<small>'+bi('Large-print reader', 'Libro de letra grande')+'</small>'+(L?'<span class="lv">'+bi('Level '+L, 'Nivel '+L)+'</span>':'');
+    var bk = C.book;
+    $('#rdCover').innerHTML = '<img src="'+esc(bk.cover)+'" alt="">'+bi(bk.title, bk.titleEs)+(L?'<span class="lv">'+bi('Level '+L, 'Nivel '+L)+'</span>':'');
     var st = $('#rdStart'), was = st.dataset.l;
     st.className = 'start'+(L?'':' wait');
     st.innerHTML = L ? bi('Start at Level '+L, 'Empezamos en el nivel '+L) : bi('Level set after the quick check', 'El nivel sale de la evaluación');
     if(L && String(L)!==was){ st.classList.add('pop'); }
     st.dataset.l = L||'';
     $$('.lvl').forEach(function(b){ b.classList.toggle('on', +b.dataset.l===L); });
-    var pages = r.pages, i = Math.min(state.page, Math.max(0, pages.length-1)); i -= i%2; state.page = i;
-    function pg(k){ var p = pages[k]; if(!p) return '<div class="pg blank"></div>';
-      return '<div class="pg">'+media(p.img, 'Page '+(k+1))+'<b>'+esc(p.text)+'</b><em>'+(k+1)+'</em></div>'; }
-    $('#spread').innerHTML = pg(i)+pg(i+1);
+    var pages = r.pages, i = Math.max(0, Math.min(state.page, pages.length-1)); state.page = i;
+    showSpread(pages, i, L);
     $('#rdLvl').innerHTML = L ? bi(r.label+' · '+r.kind, r.labelEs+' · '+r.kindEs) : bi('Level 1 (preview) · '+r.kind, 'Nivel 1 (vista previa) · '+r.kindEs);
-    var span = (i+1)+(pages[i+1]?'–'+(i+2):'');
-    $('#rdPage').innerHTML = bi('Pages '+span+' of '+pages.length, 'Páginas '+span+' de '+pages.length);
+    $('#rdPage').innerHTML = bi('Page '+pages[i].no+' · '+(i+1)+' of '+pages.length, 'Página '+pages[i].no+' · '+(i+1)+' de '+pages.length);
   }
-  // comprehension: pick n pictures from the reader at the class level, in story order
+  // One story page per spread: the picture on the left page, the words on the right page.
+  function picPage(p){ return '<div class="pg pg-pic">'+media(p.img, 'Page '+p.no)+'<span class="pg-t">'+bi(p.time, p.time===p.timeEs?'':p.timeEs)+'</span></div>'; }
+  function txtPage(p){ return '<div class="pg pg-text"><div class="pg-txt"><b>'+bigWords(p.en)+'</b><i>'+esc(p.es)+'</i></div><em>'+esc(p.no)+'</em></div>'; }
+  // Page turn: going forward, the right page lifts and turns over to the left (its back is the next picture);
+  // going back, the left page turns over to the right. The pages underneath are already the new ones.
+  var shown = null, flipT = null;
+  var REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function showSpread(pages, i, L){
+    var sp = $('#spread'), key = (L||1)+':'+i, prev = shown; shown = {key:key, L:L||1, i:i};
+    if(prev && prev.key===key && sp.children.length) return;
+    clearTimeout(flipT); var old = sp.querySelector('.leaf'); if(old) old.remove();
+    var p = pages[i], q = prev && prev.L===(L||1) ? pages[prev.i] : null, d = q ? i - prev.i : 0;
+    var open = sp.closest('.panel.big');
+    if(!q || Math.abs(d)!==1 || REDUCED || !open){
+      sp.innerHTML = '<div class="half l in">'+picPage(p)+'</div><div class="half r in">'+txtPage(p)+'</div>';
+      fitPages(); return;
+    }
+    var fwd = d > 0;
+    // underneath: the side the leaf will land on keeps the old page until it is covered
+    sp.innerHTML = '<div class="half l">'+picPage(fwd ? q : p)+'</div><div class="half r">'+txtPage(fwd ? p : q)+'</div>'
+      + '<div class="leaf '+(fwd?'fwd':'back')+'"><div class="face f">'+(fwd ? txtPage(q) : picPage(q))+'</div><div class="face b">'+(fwd ? picPage(p) : txtPage(p))+'</div></div>';
+    fitNow();
+    var leaf = sp.querySelector('.leaf');
+    void leaf.offsetWidth; leaf.classList.add('go');
+    flipT = setTimeout(function(){
+      sp.innerHTML = '<div class="half l">'+picPage(p)+'</div><div class="half r">'+txtPage(p)+'</div>'; fitNow();
+    }, 760);
+  }
+  // Shrink a page's text until the page fits (long Level 3 pages), never below 55%.
+  // Runs again after the box finishes opening, since a closed box has no height to measure.
+  var fitTimer = null;
+  function fitPages(){
+    clearTimeout(fitTimer); fitTimer = setTimeout(fitNow, 700); fitNow();
+  }
+  function fitNow(){
+    $$('#spread .pg').forEach(function(p){ if(!p.clientHeight) return; var f = 1; p.style.setProperty('--fs', f);
+      while(f > .55 && p.scrollHeight > p.clientHeight + 1){ f -= .05; p.style.setProperty('--fs', f.toFixed(2)); } });
+  }
+  window.addEventListener('resize', fitPages);
+  // English story text with the five unit words in bold blue, as in the printed reader
+  var BIG_RE = new RegExp('\\b('+C.bigWords.join('|')+')\\b', 'gi');
+  function bigWords(t){ return esc(t).replace(BIG_RE, '<span class="b5">$1</span>'); }
+  // comprehension: n pictures from the reader at the class level (the reader's `seq` list for n), in story order
   function seqCards(){
-    var pages = reader().pages, n = C.sequenceCount[state.level||1] || 3, out = [];
-    for(var k=0;k<n;k++){ var idx = n===1?0:Math.round(k*(pages.length-1)/(n-1)); out.push({k:k, text:pages[idx].text, img:pages[idx].img}); }
-    return out;
+    var r = reader(), pages = r.pages, n = C.sequenceCount[state.level||1] || 3, idx = (r.seq && r.seq[n]) || [];
+    if(idx.length!==n){ idx = []; for(var j=0;j<n;j++) idx.push(n===1?0:Math.round(j*(pages.length-1)/(n-1))); }
+    return idx.map(function(i, k){ var p = pages[i]; return {k:k, en:p.en, es:p.es, img:p.img, no:p.no}; });
   }
   function ensureShuffle(n){
     var sh = state.seq.shuffle;
@@ -259,7 +299,7 @@
   function slotName(k, n){ return k===0 ? bi('First', 'Primero') : k===n-1 ? bi('Last', 'Último') : (n>3 ? bi('Next '+k, 'Luego '+k) : bi('Next', 'Luego')); }
   function renderComp(){
     var cards = seqCards(), n = cards.length, sh = ensureShuffle(n), placed = state.seq.placed, chk = state.seq.checked;
-    function card(c, key){ return '<div class="scard" data-act="seq" data-k="'+c.k+'">'+(key?'<span class="k">'+key+'</span>':'')+media(c.img, 'Picture')+'<b>'+esc(c.text)+'</b></div>'; }
+    function card(c, key){ return '<div class="scard" data-act="seq" data-k="'+c.k+'">'+(key?'<span class="k">'+key+'</span>':'')+media(c.img, 'Picture')+'<b>'+esc(c.en)+'</b></div>'; }
     var right = 0;
     var slots = cards.map(function(_, s){ var pk = placed[s], cls = '';
       if(chk && pk!=null){ cls = pk===s ? ' ok' : ' no'; if(pk===s) right++; }
@@ -356,7 +396,7 @@
   function setLevel(L, source){ L = L ? Math.max(1, Math.min(3, +L)) : null; if(L===state.level) return;
     state.levelLog.push({at:new Date().toISOString(), from:state.level, to:L, source:source||'board'});
     state.level = L; state.page = 0; state.seq = {placed:[], checked:false, shuffle:[]}; render(); }
-  function turn(d){ var n = reader().pages.length, p = state.page + 2*d; if(p<0 || p>=n) return; state.page = p; renderRead(); save(); }
+  function turn(d){ var n = reader().pages.length, p = state.page + (d>0 ? 1 : -1); if(p<0 || p>=n) return; state.page = p; renderRead(); save(); }
   function seqPlace(k){ var pl = state.seq.placed; if(pl.indexOf(k)>=0) return; var s = 0; while(pl[s]!=null) s++;
     if(s>=seqCards().length) return; pl[s] = k; state.seq.checked = false; renderComp(); save(); }
   function seqUnplace(s){ if(state.seq.placed[s]==null) return; state.seq.placed[s] = null; state.seq.checked = false; renderComp(); save(); }

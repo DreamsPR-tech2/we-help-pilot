@@ -19,7 +19,7 @@
   ];
   var TABS = [['lesson', 'Lesson'], ['screen', 'Screen'], ['stop', 'Stop check'], ['results', 'Results'], ['setup', 'Setup']];
   var ZERO_REASONS = ['Distracted', 'Did not want to take part', 'Did not seem to understand', 'Upset or tired'];
-  var STEP_WRAP = 6, STEP_SUM = 7;   // screen steps: 0–4 items 1–5, 5 bonus, 6 mode & engagement, 7 summary
+  var STEP_WRAP = 6, STEP_SUM = 7;   // screen steps: 0–4 items 3–7, 5 bonus (item 8), 6 mode & engagement, 7 summary
 
   function me(){ return St.me(); }
   function data(){ return St.get(); }
@@ -104,12 +104,17 @@
   // =====================================================================
   // SCREEN: roster
   // =====================================================================
+  var CORE = ITEMS.filter(function(it){ return !it.optional; });   // items 3–7
+  function itemByN(n){ return ITEMS.filter(function(it){ return it.n === n; })[0]; }
   function status(s){
-    var r = result(s), started = ['a1','a2','a3','a4','a5'].some(function(k){ return given(s[k]); });
-    if(!r.complete) return started ? { cls: 'part', pill: '<span class="pill wait">In progress · ' + (5 - r.missing.length) + ' of 5</span>' } : { cls: '', pill: '<span class="pill wait">Not screened</span>' };
-    var p = '<span class="pill">' + r.start_total + '/15</span>' + levelPill(r.start_level);
+    var r = result(s), started = CORE.some(function(it){ return given(s[it.key + '_status']) || given(s[it.key]); });
+    if(r.invalid) return { cls: 'flag', pill: '<span class="pill re" title="' + esc(r.invalid) + '">Old 0–3 scores · screen again</span>' };
+    if(!r.complete) return started ? { cls: 'part', pill: '<span class="pill wait">In progress · ' + (CORE.length - r.missing.length) + ' of ' + CORE.length + '</span>' } : { cls: '', pill: '<span class="pill wait">Not screened</span>' };
+    var p = r.start_total !== null ? '<span class="pill">' + r.start_total + '/9</span>' : '<span class="pill">Not administered: item ' + r.not_administered.join(', ') + '</span>';
+    p += r.needs_teacher_level ? '<span class="pill re">Teacher sets level</span>' : levelPill(r.start_level) + (r.level_override ? '<span class="pill">set by teacher</span>' : '');
+    if(r.teacher_flags.indexOf('zero_total') >= 0) p += '<span class="pill re">Total 0 · review</span>';
     if(r.rescreen_needed) p += r.rescreen_done ? '<span class="pill ok">2nd screen ' + (r.growth >= 0 ? '+' : '') + r.growth + '</span>' : '<span class="pill re">2nd screen: ' + r.flagged_items.length + ' items</span>';
-    return { cls: r.rescreen_needed && !r.rescreen_done ? 'flag' : 'done', pill: p };
+    return { cls: (r.rescreen_needed && !r.rescreen_done) || r.needs_teacher_level ? 'flag' : 'done', pill: p };
   }
   function viewRoster(){
     var sm = summary(), list = students();
@@ -119,7 +124,7 @@
       + (sm.class_level ? '<span class="pill">Class level so far</span>' + levelPill(sm.class_level) : '') + '</div></div>'
       + '<div class="roster">' + list.map(function(s){ var st = status(s);
           return '<button type="button" class="stu ' + st.cls + '" data-id="' + s.id + '"><span class="no">#' + s.no + '</span><b>' + esc(s.name) + '</b><span class="row" style="gap:5px">' + st.pill + '</span></button>'; }).join('') + '</div>'
-      + '<div class="card stack"><div class="spread"><h3>Second screen</h3><span class="muted small">Level 1 or 2 students, items scored 0 or 1 only</span></div>'
+      + '<div class="card stack"><div class="spread"><h3>Second screen</h3><span class="muted small">Level 1 or 2 students: item 3 with 0–2 words, items 4–7 scored 0</span></div>'
       + (order.length ? '<div class="chips">' + order.map(function(i){ var s = list[i], r = sm.students[i];
           return '<button type="button" class="btn' + (r.rescreen_done ? ' ghost' : '') + '" data-re="' + s.id + '">' + (r.rescreen_done ? '✓ ' : '') + esc(s.name) + ' · items ' + r.flagged_items.join(', ') + '</button>'; }).join('') + '</div>'
         : '<p class="muted small" style="margin:0">Nobody needs a second screen yet.</p>')
@@ -129,18 +134,39 @@
       var re = e.target.closest('[data-re]'); if(re){ go('rescreen/' + re.dataset.re + '/0'); }
     };
   }
-  function firstOpenStep(s){ for(var i = 0; i < 5; i++) if(!given(s[ITEMS[i].key])) return i; return 5; }
+  function firstOpenStep(s){ for(var i = 0; i < CORE.length; i++) if(!given(s[CORE[i].key + '_status'])) return i; return CORE.length; }
 
   // =====================================================================
   // SCREEN: one student, one item per screen
+  // The screener records what happened (words, count, steps, sound, anchor, mode, support) or taps
+  // No response / Not administered. Score and status are worked out by WeHelpScoring.scoreItem.
   // =====================================================================
-  function a1FromMissed(missed){ var c = 5 - missed.length; return c === 5 ? 3 : c >= 3 ? 2 : c >= 1 ? 1 : 0; }
+  var NA_REASONS = ['Ran out of time', 'Student left the screen', 'Not ready today', 'Item skipped by mistake'];
   function setField(id, fn){ St.update(function(d){ var s = d.students.filter(function(x){ return x.id === id; })[0]; if(s){ fn(s); s.recorded_by = (me() || {}).name || ''; } }); }
+  function fieldKey(it, re){ return re ? it.key.replace(/^a/, 'r') : it.key; }
+  // Recompute score + status for one item from what the screener recorded.
+  function rescore(x, it, k){
+    if(it.optional) return;
+    var pick = x[k + '_pick'], res;
+    if(pick) res = S.scoreItem(it.n, { status: pick });
+    else if(it.input === 'words') res = x[k + '_done'] ? S.scoreItem(it.n, { words: x[k + '_words'] || [] }) : null;
+    else if(it.input === 'count') res = S.scoreItem(it.n, { count: x[k + '_count'] });
+    else if(it.input === 'steps') res = S.scoreItem(it.n, { steps: x[k + '_steps'], in_order: x[k + '_in_order'] });
+    else if(it.input === 'sound') res = S.scoreItem(it.n, { sound: x[k + '_sound'] });
+    else if(it.input === 'anchor') res = S.scoreItem(it.n, { anchor: x[k + '_anchor'] });
+    x[k] = res ? res.score : null; x[k + '_status'] = res ? res.status : null;
+    if(x[k] !== 0 && x[k + '_status'] !== 'not_administered' && x.zero_notes) delete x.zero_notes[k];
+  }
+  function setItem(id, it, re, fn){
+    var k = fieldKey(it, re);
+    setField(id, function(x){ fn(x, k); rescore(x, it, k); if(re) x[k + '_at'] = St.now(); });
+    render();
+  }
 
   function viewScreen(id, step, re){
     var s = St.student(id); if(!s){ go('screen'); return; }
     var r = result(s);
-    var items = re ? r.flagged_items.map(function(n){ return ITEMS[n - 1]; }) : ITEMS;
+    var items = re ? r.flagged_items.map(itemByN) : ITEMS;
     var last = re ? items.length : STEP_SUM;
     if(step == null || isNaN(step)) step = 0;
     if(!re && !s.started_at) setField(id, function(x){ x.started_at = St.now(); });
@@ -148,8 +174,8 @@
     s = St.student(id);
 
     var dots = items.map(function(it, i){
-      var k = re ? 'r' + it.n : it.key, v = s[k], cls = i === step ? 'cur' : given(v) ? 'done' : '';
-      return '<button type="button" data-step="' + i + '" class="' + cls + '" aria-label="Item ' + it.n + '">' + (it.n === 'bonus' ? '★' : it.n) + '</button>';
+      var k = fieldKey(it, re), v = it.optional ? s.bonus : s[k + '_status'], cls = i === step ? 'cur' : given(v) ? 'done' : '';
+      return '<button type="button" data-step="' + i + '" class="' + cls + '" aria-label="Item ' + it.n + '">' + (it.optional ? '★' : it.n) + '</button>';
     }).join('') + (re ? '' : '<button type="button" data-step="' + STEP_WRAP + '" class="' + (step === STEP_WRAP ? 'cur' : given(s.response_mode) && given(s.engaged) ? 'done' : '') + '" aria-label="Mode and engagement">✎</button>');
 
     var head = '<div class="scr-top"><button class="btn ghost" type="button" data-nav="roster">← Roster</button><span class="who">' + esc(s.name) + '</span>'
@@ -164,19 +190,26 @@
     app.innerHTML = '<div class="stack">' + head + '<div class="card">' + body + '</div></div>';
     startClock(s, re);
 
+    var it = items[step];
     app.onclick = function(e){
       var t = e.target, b;
       if((b = t.closest('[data-nav="roster"]'))){ go('screen'); return; }
       if((b = t.closest('[data-step]'))){ go((re ? 'rescreen/' : 'screen/') + id + '/' + b.dataset.step); return; }
-      if((b = t.closest('[data-score]'))){ score(s, items[step], re, +b.dataset.score, step); return; }
-      if((b = t.closest('[data-miss]'))){ var w = b.dataset.miss; setField(id, function(x){ var m = (x.a1_missed || []).slice(); var i = m.indexOf(w); if(i >= 0) m.splice(i, 1); else m.push(w); x.a1_missed = S.BIG5.filter(function(v){ return m.indexOf(v) >= 0; }); x.a1 = a1FromMissed(x.a1_missed); }); render(); return; }
+      if((b = t.closest('[data-pick]'))){ var pk = b.dataset.pick; setItem(id, it, re, function(x, k){ x[k + '_pick'] = x[k + '_pick'] === pk ? null : pk; }); return; }
+      if((b = t.closest('[data-word]'))){ var w = b.dataset.word; setItem(id, it, re, function(x, k){ var m = (x[k + '_words'] || []).slice(), i = m.indexOf(w); if(i >= 0) m.splice(i, 1); else m.push(w);
+          x[k + '_words'] = S.BIG5.filter(function(v){ return m.indexOf(v) >= 0; }); x[k + '_done'] = true; x[k + '_pick'] = null; }); return; }
+      if((b = t.closest('[data-nowords]'))){ setItem(id, it, re, function(x, k){ x[k + '_words'] = []; x[k + '_done'] = true; x[k + '_pick'] = null; }); return; }
+      if((b = t.closest('[data-raw]'))){ var f = b.dataset.raw, raw = JSON.parse(b.dataset.v);
+        setItem(id, it, re, function(x, k){ if(f === 'steps'){ x[k + '_steps'] = raw[0]; x[k + '_in_order'] = raw[1]; } else x[k + '_' + f] = raw; x[k + '_pick'] = null; }); return; }
+      if((b = t.closest('[data-opt]'))){ var o = b.dataset.opt, ov = b.dataset.v; setItem(id, it, re, function(x, k){ x[k + '_' + o] = x[k + '_' + o] === ov ? null : ov; }); return; }
+      if((b = t.closest('[data-bonus]'))){ var bv = b.dataset.bonus; setField(id, function(x){ x.bonus = x.bonus === bv ? null : bv; }); render(); return; }
       if((b = t.closest('[data-reason]'))){ var key = b.dataset.key; setField(id, function(x){ x.zero_notes = x.zero_notes || {}; x.zero_notes[key] = b.dataset.reason; }); render(); return; }
       if((b = t.closest('[data-next]'))){ nextStep(id, step, re, last); return; }
       if((b = t.closest('[data-prev]'))){ if(step > 0) go((re ? 'rescreen/' : 'screen/') + id + '/' + (step - 1)); return; }
-      if((b = t.closest('[data-skip]'))){ setField(id, function(x){ x.bonus = null; }); go('screen/' + id + '/' + STEP_WRAP); return; }
       if((b = t.closest('[data-mode]'))){ setField(id, function(x){ x.response_mode = x.response_mode === b.dataset.mode ? null : b.dataset.mode; }); render(); return; }
       if((b = t.closest('[data-eng]'))){ setField(id, function(x){ x.engaged = b.dataset.eng === 'yes'; }); render(); return; }
       if((b = t.closest('[data-save]'))){ saveScreen(id); return; }
+      if((b = t.closest('[data-lvl]'))){ var L = +b.dataset.lvl; setField(id, function(x){ x.level_override = x.level_override === L ? null : L; x.level_override_by = (me() || {}).name || ''; x.level_override_at = St.now(); }); render(); return; }
       if((b = t.closest('[data-mat]'))){ openMat(b.dataset.mat.split(',')); return; }
       if((b = t.closest('.wait5'))){ b.classList.remove('run', 'end'); void b.offsetWidth; b.classList.add('run'); clearTimeout(b._t); b._t = setTimeout(function(){ b.classList.add('end'); }, 5000); return; }
       if((b = t.closest('[data-nextstu]'))){ var nx = nextUnscreened(id); go(nx ? 'screen/' + nx + '/0' : 'screen'); return; }
@@ -186,40 +219,71 @@
       var t = e.target;
       if(t.dataset.note){ var key = t.dataset.note, v = t.value; setField(id, function(x){ x.zero_notes = x.zero_notes || {}; x.zero_notes[key] = v; }); }
       if(t.id === 'engNote'){ var v2 = t.value; setField(id, function(x){ x.engagement_note = v2; }); }
+      if(t.id === 'lvlWhy'){ var v3 = t.value; setField(id, function(x){ x.level_override_reason = v3; }); }
     };
   }
 
+  function choice(attr, val, on, label, extra){ return '<button type="button" class="chip' + (on ? ' on' : '') + '" ' + attr + '="' + esc(val) + '"' + (extra || '') + '>' + label + '</button>'; }
+  function rawBtn(field, v, on, label){ return '<button type="button" class="sc' + (on ? ' on' : '') + '" data-raw="' + field + '" data-v=\'' + JSON.stringify(v) + '\'><b>' + label + '</b></button>'; }
+  function optRow(title, o, list, cur){ return '<div class="missed"><b>' + title + '</b><div class="chips">' + list.map(function(p){ return '<button type="button" class="chip' + (cur === p[0] ? ' on' : '') + '" data-opt="' + o + '" data-v="' + esc(p[0]) + '">' + esc(p[1]) + '</button>'; }).join('') + '</div></div>'; }
+  var SUPPORT_LIST = Object.keys(S.SUPPORT).map(function(k){ return [k, S.SUPPORT[k]]; });
+  var MODE_LIST = S.RESPONSE_MODES.map(function(m){ return [m, m]; });
+
   function itemView(s, it, re){
-    var k = re ? 'r' + it.n : it.key, v = s[k], noteKey = k;
+    var k = fieldKey(it, re), v = s[k], st = s[k + '_status'], pick = s[k + '_pick'];
     var startV = re ? s[it.key] : null;
-    var h = '<div class="item"><div class="area">' + (it.n === 'bonus' ? 'Bonus' : 'Item ' + it.n) + ' · ' + esc(it.area)
+    var h = '<div class="item"><div class="area">' + (it.optional ? 'Item 8 · Bonus' : 'Item ' + it.n) + ' · ' + esc(it.area)
       + (it.draft ? '<span class="draft">draft wording</span>' : '') + (re ? ' <span class="pill">started at ' + startV + '</span>' : '') + '</div>'
       + '<div class="show"><b>Show:</b> ' + esc(it.show) + '</div><div class="say">' + esc(it.say) + '</div>'
-      + '<div class="row"><button type="button" class="btn wait5"><i></i>⏱ Wait 5 s</button><button type="button" class="btn" data-mat="' + it.mat.join(',') + '">▣ Card mat</button></div>';
-    if(it.n === 1){
-      var miss = re ? (s.r1_missed || []) : (s.a1_missed || []);
-      h += re ? '' : '<div class="missed"><b>Tap the words missed</b><div class="chips">' + S.BIG5.map(function(w){ return '<button type="button" class="chip miss' + (miss.indexOf(w) >= 0 ? ' on' : '') + '" data-miss="' + w + '">' + w + '</button>'; }).join('') + '</div>'
-        + '<span class="muted small">' + (5 - miss.length) + ' of 5 correct. The score below follows; tap 0 for no response.</span></div>';
+      + '<div class="row"><button type="button" class="btn wait5"><i></i>⏱ Wait 5 s</button><button type="button" class="btn" data-mat="' + it.mat.join(',') + '">▣ Card mat</button></div>'
+      + '<p class="small muted" style="margin:0">' + esc(it.rule) + '</p>';
+
+    if(it.optional){
+      h += '<div class="scores">' + S.BONUS.map(function(b){ return '<button type="button" class="sc' + (s.bonus === b ? ' on' : '') + '" data-bonus="' + b + '"><b>' + b + '</b></button>'; }).join('') + '</div>'
+        + '<div class="navrow"><button type="button" class="btn" data-prev>← Back</button><button type="button" class="btn pri big" data-next>Next →</button></div></div>';
+      return h;
     }
-    h += '<div class="scores">' + it.rubric.map(function(txt, i){ return '<button type="button" class="sc' + (v === i ? ' on' : '') + '" data-s="' + i + '" data-score="' + i + '"><b>' + i + '</b><span>' + esc(txt) + '</span></button>'; }).join('') + '</div>';
-    if(v === 0){
-      var note = (s.zero_notes || {})[noteKey] || '';
-      h += '<div class="zero"><b>If 0, why?</b><div class="chips">' + ZERO_REASONS.map(function(rz){ return '<button type="button" class="chip' + (note === rz ? ' on' : '') + '" data-reason="' + esc(rz) + '" data-key="' + noteKey + '">' + rz + '</button>'; }).join('') + '</div>'
-        + '<input type="text" data-note="' + noteKey + '" value="' + esc(note) + '" placeholder="Or type a short note"></div>';
+
+    var off = !!pick;   // No response / Not administered chosen: raw inputs are ignored
+    if(it.input === 'words'){
+      var w = s[k + '_words'] || [], done = s[k + '_done'];
+      h += '<div class="missed"><b>Tap each word the student showed correctly</b><div class="chips">' + S.BIG5.map(function(x){ return choice('data-word', x, !off && w.indexOf(x) >= 0, x); }).join('')
+        + choice('data-nowords', '1', !off && done && !w.length, 'None correct (tried)') + '</div>'
+        + '<span class="muted small">' + (off || !done ? 'Not recorded yet.' : w.length + ' of 5 correct.') + '</span></div>';
+    }
+    if(it.input === 'count'){
+      var c = s[k + '_count'];
+      h += '<div class="missed"><b>How many of the 5 words did the student communicate?</b></div><div class="scores">'
+        + [0, 1, 2, 3, 4, 5].map(function(n){ return rawBtn('count', n, !off && c === n, n); }).join('') + '</div>'
+        + optRow('Response mode', 'mode', MODE_LIST, s[k + '_mode']) + optRow('Support', 'support', SUPPORT_LIST, s[k + '_support']);
+    }
+    if(it.input === 'steps'){
+      var sp = s[k + '_steps'], io = s[k + '_in_order'];
+      h += '<div class="scores">' + rawBtn('steps', [0, null], !off && sp === 0, 'No steps') + rawBtn('steps', [1, null], !off && sp === 1, 'One step')
+        + rawBtn('steps', [2, false], !off && sp === 2 && io === false, 'Both steps, out of order') + rawBtn('steps', [2, true], !off && sp === 2 && io !== false, 'Both steps, in order') + '</div>'
+        + optRow('Assistance', 'support', SUPPORT_LIST, s[k + '_support']);
+    }
+    if(it.input === 'sound'){
+      var so = s[k + '_sound'];
+      h += '<div class="scores">' + rawBtn('sound', true, !off && so === true, 'Correct sound') + rawBtn('sound', false, !off && so === false, 'Incorrect sound') + '</div>';
+    }
+    if(it.input === 'anchor'){
+      var an = s[k + '_anchor'];
+      h += '<div class="scores">' + rawBtn('anchor', 2, !off && an === 2, 'Both words: “We help.”') + rawBtn('anchor', 1, !off && an === 1, 'One word') + rawBtn('anchor', 0, !off && an === 0, 'Tried, no words') + '</div>'
+        + optRow('Response mode', 'mode', MODE_LIST, s[k + '_mode']) + optRow('Support', 'support', SUPPORT_LIST, s[k + '_support']);
+    }
+    h += '<div class="row">' + choice('data-pick', 'no_response', pick === 'no_response', 'No response') + choice('data-pick', 'not_administered', pick === 'not_administered', 'Not administered') + '</div>';
+    h += '<div class="stat" style="margin:0"><small>Result</small><b>' + (st ? (v === null ? 'blank' : v + '<small> / ' + S.MAX[it.n] + '</small>') + ' · ' + esc(S.STATUS[st]) : '<small>not recorded yet</small>') + '</b></div>';
+    if(st === 'not_administered' || v === 0){
+      var note = (s.zero_notes || {})[k] || '', reasons = st === 'not_administered' ? NA_REASONS : ZERO_REASONS;
+      h += '<div class="zero"><b>' + (st === 'not_administered' ? 'Why not administered?' : 'If 0, why?') + '</b><div class="chips">' + reasons.map(function(rz){ return '<button type="button" class="chip' + (note === rz ? ' on' : '') + '" data-reason="' + esc(rz) + '" data-key="' + k + '">' + rz + '</button>'; }).join('') + '</div>'
+        + '<input type="text" data-note="' + k + '" value="' + esc(note) + '" placeholder="Or type a short note"></div>';
     }
     h += '<div class="navrow"><button type="button" class="btn" data-prev>← Back</button>'
-      + (it.optional ? '<button type="button" class="btn ghost" data-skip>Skip bonus</button>' : '')
-      + '<button type="button" class="btn pri big" data-next' + (given(v) || it.optional ? '' : ' disabled') + '>Next →</button></div></div>';
+      + '<button type="button" class="btn pri big" data-next' + (st ? '' : ' disabled') + '>Next →</button></div></div>';
     return h;
   }
 
-  function score(s, it, re, val, step){
-    var k = re ? 'r' + it.n : it.key, id = s.id;
-    setField(id, function(x){ x[k] = val; if(val !== 0 && x.zero_notes) delete x.zero_notes[k]; if(re) x['r' + it.n + '_at'] = St.now(); });
-    // auto-advance on 1–3 (a 0 waits for the note; item 1 waits for the missed words)
-    if(val !== 0 && it.n !== 1){ render(); setTimeout(function(){ var r2 = route(); if(r2.id === id && r2.step === step) nextStep(id, step, re, re ? result(St.student(id)).flagged_items.length : STEP_SUM); }, 380); }
-    else render();
-  }
   function nextStep(id, step, re, last){
     var n = step + 1; if(n > last) n = last;
     go((re ? 'rescreen/' : 'screen/') + id + '/' + n);
@@ -231,36 +295,52 @@
       + '<h3>Main response mode</h3><div class="chips">' + S.RESPONSE_MODES.map(function(m){ return '<button type="button" class="chip' + (s.response_mode === m ? ' on' : '') + '" data-mode="' + m + '">' + m + '</button>'; }).join('') + '</div>'
       + '<h3>Motivated and engaged?</h3><div class="row"><button type="button" class="btn' + (s.engaged === true ? ' on' : '') + '" data-eng="yes">Yes</button><button type="button" class="btn' + (s.engaged === false ? ' on' : '') + '" data-eng="no">No</button></div>'
       + '<input type="text" id="engNote" value="' + esc(s.engagement_note || '') + '" placeholder="One-line note (students never see this)">'
-      + (miss.length ? '<div class="zero"><b>Still missing: item ' + miss.join(', ') + '</b><span class="small">A missing item is not a zero. Score it, or leave the screen open and come back.</span></div>' : '')
+      + (miss.length ? '<div class="zero"><b>Still missing: item ' + miss.join(', ') + '</b><span class="small">Record a result for each item, or mark it Not administered. A missing item is never a zero.</span></div>' : '')
       + '<div class="navrow"><button type="button" class="btn" data-prev>← Back</button><button type="button" class="btn pri big" data-save' + (miss.length ? ' disabled' : '') + '>Save screen</button></div></div>';
   }
   function saveScreen(id){
     var s = St.student(id), miss = S.missingItems(St.toRec(s));
-    if(miss.length){ toast('Score item ' + miss.join(', ') + ' first'); return; }
+    if(miss.length){ toast('Record item ' + miss.join(', ') + ' first'); return; }
     setField(id, function(x){ x.finished_at = St.now(); x.screened_by = (me() || {}).name || ''; });
     go('screen/' + id + '/' + STEP_SUM);
   }
   function nextUnscreened(id){ var l = students(); for(var i = 0; i < l.length; i++){ if(l[i].id !== id && !result(l[i]).complete) return l[i].id; } return null; }
 
-  function flagText(r){ return r.flags.length ? '<div class="reco">' + r.flags.map(function(f){ return '<div>' + esc(S.FLAGS[f]) + '</div>'; }).join('') + '</div>' : ''; }
+  function flagText(r){
+    var all = r.teacher_flags.map(function(f){ return S.TEACHER_FLAGS[f]; }).concat(r.flags.map(function(f){ return S.FLAGS[f]; }));
+    return all.length ? '<div class="reco">' + all.map(function(t){ return '<div>' + esc(t) + '</div>'; }).join('') + '</div>' : '';
+  }
+  function itemTable(r){
+    return '<div class="tablewrap"><table class="res"><tr><th>Item</th><th>Score</th><th>Status</th></tr>' + r.items.map(function(i){
+      return '<tr><td>' + i.n + ' · ' + esc(S.ITEM_INFO[i.n].area) + '</td><td class="n">' + (i.score === null ? '' : i.score + ' / ' + S.MAX[i.n]) + '</td><td>' + esc(S.STATUS[i.status] || '') + '</td></tr>'; }).join('') + '</table></div>';
+  }
+  // Teacher override: required when an item was not administered, optional otherwise.
+  function levelPicker(s, r){
+    var need = r.not_administered.length > 0;
+    return '<div class="card stack" style="margin:0"><h3>' + (need ? 'Teacher sets the starting level' : 'Change the starting level') + '</h3>'
+      + '<p class="small muted" style="margin:0">' + (need ? 'Item ' + r.not_administered.join(', ') + ' was not administered, so there is no automatic level.' : 'Automatic level: ' + r.auto_level + '. Only change it if the teacher decides to.') + '</p>'
+      + '<div class="row">' + [1, 2, 3].map(function(L){ return '<button type="button" class="btn' + (r.level_override === L ? ' on' : '') + '" data-lvl="' + L + '">Level ' + L + '</button>'; }).join('') + '</div>'
+      + (r.level_override ? '<input type="text" id="lvlWhy" value="' + esc(s.level_override_reason || '') + '" placeholder="Reason (saved with the level)">' + (s.level_override_by ? '<span class="small muted">Set by ' + esc(s.level_override_by) + '</span>' : '') : '')
+      + '</div>';
+  }
   function summaryView(s){
     var r = result(s);
     if(!r.complete) return '<p>This screen isn’t finished. Missing item ' + r.missing.join(', ') + '.</p><button class="btn pri" type="button" data-step="' + firstOpenStep(s) + '">Continue screen</button>';
     var dur = s.started_at && s.finished_at ? new Date(s.finished_at) - new Date(s.started_at) : null;
     return '<div class="stack"><h2>' + esc(s.name) + ' · saved</h2><div class="sumbox">'
-      + '<div class="stat"><small>Total</small><b>' + r.start_total + '<small> / 15</small></b></div>'
-      + '<div class="stat"><small>Target (8+)</small><b>' + (r.target_met ? 'Met' : 'Not yet') + '</b></div>'
-      + '<div class="stat"><small>Level</small><b>' + r.start_level + '</b></div>'
-      + (given(s.bonus) ? '<div class="stat"><small>Bonus</small><b>' + s.bonus + '<small> / 3</small></b></div>' : '')
+      + (r.start_total !== null ? '<div class="stat"><small>Total</small><b>' + r.start_total + '<small> / 9</small></b></div>' + '<div class="stat"><small>Target (' + S.TARGET + '+)</small><b>' + (r.target_met ? 'Met' : 'Not yet') + '</b></div>'
+        : '<div class="stat"><small>Total</small><b>–<small> ' + r.partial_total + ' on the items given</small></b></div>')
+      + '<div class="stat"><small>Level</small><b>' + (r.start_level || '–') + (r.level_override ? '<small> teacher</small>' : '') + '</b></div>'
+      + (given(s.bonus) ? '<div class="stat"><small>Bonus</small><b>' + esc(s.bonus) + '</b></div>' : '')
       + (dur ? '<div class="stat"><small>Time</small><b>' + fmtSecs(dur) + '</b></div>' : '') + '</div>'
-      + flagText(r)
+      + flagText(r) + itemTable(r) + levelPicker(s, r)
       + (r.rescreen_needed ? '<p class="small muted" style="margin:0">Second screen later on item ' + r.flagged_items.join(', ') + '.</p>' : '')
       + '<div class="navrow"><button type="button" class="btn" data-step="0">Edit scores</button><button type="button" class="btn pri big" data-nextstu>Next student →</button></div></div>';
   }
   function reSummaryView(s){
     var r = result(s);
-    var rows = r.flagged_items.map(function(n){ var a = s['a' + n], b = s['r' + n];
-      return '<tr><td>Item ' + n + ' · ' + esc(ITEMS[n - 1].area) + '</td><td class="n">' + a + '</td><td class="n">' + (given(b) ? b : '–') + '</td></tr>'; }).join('');
+    var rows = r.flagged_items.map(function(n){ var it = itemByN(n), a = s[it.key], b = s[fieldKey(it, true)];
+      return '<tr><td>Item ' + n + ' · ' + esc(it.area) + '</td><td class="n">' + a + '</td><td class="n">' + (given(b) ? b : '–') + '</td></tr>'; }).join('');
     return '<div class="stack"><h2>' + esc(s.name) + ' · second screen</h2>'
       + '<div class="tablewrap"><table class="res"><tr><th>Reassessed item</th><th>Start</th><th>Now</th></tr>' + rows + '</table></div>'
       + '<div class="sumbox"><div class="stat"><small>Start → end</small><b>' + r.start_total + ' → ' + r.end_total + '</b></div>'
@@ -501,8 +581,8 @@
   function viewResults(){
     var sm = summary(), list = students(), d = data();
     var rows = list.map(function(s, i){ var r = sm.students[i];
-      return '<tr><td>' + s.no + '</td><td><b>' + esc(s.name) + '</b></td><td>' + (s.present === true ? 'Yes' : s.present === false ? 'No' : '') + '</td><td class="n">' + (r.complete ? r.start_total : '–') + '</td><td>' + (r.complete ? (r.target_met ? '<span class="pill ok">Yes</span>' : '<span class="pill no">No</span>') : '<span class="pill wait">' + (r.missing.length < 5 ? 'Missing ' + r.missing.join(',') : 'Not screened') + '</span>') + '</td>'
-        + '<td>' + levelPill(r.start_level) + '</td><td>' + (s.engaged === true ? 'Y' : s.engaged === false ? 'N' : '') + '</td>'
+      return '<tr><td>' + s.no + '</td><td><b>' + esc(s.name) + '</b></td><td>' + (s.present === true ? 'Yes' : s.present === false ? 'No' : '') + '</td><td class="n">' + (r.complete && r.start_total !== null ? r.start_total : '–') + '</td><td>' + (r.complete ? (r.start_total === null ? '<span class="pill wait">Item ' + r.not_administered.join(',') + ' not given</span>' : r.target_met ? '<span class="pill ok">Yes</span>' : '<span class="pill no">No</span>') : '<span class="pill wait">' + (r.missing.length < 5 ? 'Missing ' + r.missing.join(',') : 'Not screened') + '</span>') + '</td>'
+        + '<td>' + (r.needs_teacher_level ? '<a class="pill re" href="#screen/' + s.id + '/' + STEP_SUM + '">Teacher sets level</a>' : levelPill(r.start_level) + (r.level_override ? ' <small>teacher</small>' : '')) + (r.teacher_flags.indexOf('zero_total') >= 0 ? ' <span class="pill re">Total 0</span>' : '') + '</td><td>' + (s.engaged === true ? 'Y' : s.engaged === false ? 'N' : '') + '</td>'
         + '<td>' + (r.rescreen_needed ? (r.rescreen_done ? '<span class="pill ok">Done</span>' : '<span class="pill re">Items ' + r.flagged_items.join(',') + '</span>') : '') + '</td>'
         + '<td class="n">' + (r.rescreened ? r.end_total : '') + '</td><td>' + (r.rescreened ? levelPill(r.end_level) : '') + '</td><td class="n">' + (r.rescreened ? (r.growth >= 0 ? '+' : '') + r.growth : '') + '</td>'
         + '<td class="n">' + ((s.stop || []).filter(Boolean).length ? (s.stop || []).filter(function(v){ return v === 'Y'; }).length + '/' + (s.stop || []).filter(Boolean).length : '') + '</td>'
@@ -513,7 +593,8 @@
       + '<div class="spread"><h2>Results · ' + esc(d.session.date) + '</h2><button type="button" class="btn pri" id="csv">⬇ Export CSV (no names)</button></div>'
       + '<div class="sumbox">'
       + '<div class="stat"><small>Screened</small><b>' + sm.screened + '<small> of ' + list.length + '</small></b></div>'
-      + '<div class="stat"><small>Met target (8+)</small><b>' + sm.target_met + '<small> of ' + sm.screened + '</small></b></div>'
+      + '<div class="stat"><small>Met target (' + S.TARGET + '+ of 9)</small><b>' + sm.target_met + '<small> of ' + sm.with_total + '</small></b></div>'
+      + (sm.needs_teacher_level ? '<div class="stat"><small>Teacher sets level</small><b>' + sm.needs_teacher_level + '</b></div>' : '')
       + '<div class="stat"><small>Class level</small><b>' + (sm.class_level || '–') + '</b></div>'
       + '<div class="stat"><small>Levels 1 · 2 · 3</small><b>' + sm.level_counts[1] + ' · ' + sm.level_counts[2] + ' · ' + sm.level_counts[3] + '</b></div>'
       + '<div class="stat"><small>Stop check</small><b>' + (sm.stop_percent === null ? '–' : sm.stop_percent + '%') + '<small> ' + (sm.stop_yes + sm.stop_no ? sm.stop_yes + ' of ' + (sm.stop_yes + sm.stop_no) + ' turns' : '') + '</small></b></div>'

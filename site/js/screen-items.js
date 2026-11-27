@@ -1,31 +1,39 @@
-/* Quick Check items, from Toolkit v2.0 "Questions and rubric".
- * Item 1 follows the scale agreed in the meeting. Items 2–5 and the bonus are drafts for Kristen & Cari to confirm:
+/* Quick Check items 3–8 (the 9-point primary screen; scoring rules are in scoring.js).
+ * Show/say wording comes from Toolkit v2.0. Items 4–8 wording is still marked draft for Kristen & Cari to confirm:
  * edit the text here and the screener picks it up. `mat` = which picture cards the student card mat shows.
+ * `input` = what the screener records:
+ *   words  tap each word the student showed correctly (score = number correct)
+ *   count  how many of the 5 words the student communicated, plus response mode and support
+ *   steps  steps completed (0, 1, 2) and whether in order, plus assistance level
+ *   sound  correct or incorrect
+ *   anchor both words / one word / none, plus response mode and support
+ *   bonus  Completed / Attempted / Not offered (never scored)
+ * Every scored item also has "No response" and "Not administered" buttons.
  */
 window.WEHELP_ITEMS = [
-  { n: 1, key: 'a1', area: 'Receptive vocabulary', draft: false,
+  { n: 3, key: 'a1', area: 'Receptive vocabulary', draft: false, input: 'words',
     show: 'All 5 Big 5 cards in a row', say: '“Point to HELP… STOP… SEE… GO… DO.”',
-    rubric: ['No response, or none correct', '1–2 correct', '3–4 correct', '5 correct'],
+    rule: '1 point per word shown correctly (0–5).',
     mat: ['help', 'do', 'see', 'go', 'stop'] },
-  { n: 2, key: 'a2', area: 'Expressive vocabulary', draft: true,
-    show: 'Picture of a student walking (or the go action)', say: '“What is she doing?”',
-    rubric: ['No response', 'Gives the word only after a model', 'Gives “go” alone', 'Gives a phrase alone (“We go”)'],
-    mat: ['walking'] },
-  { n: 3, key: 'a3', area: '2-step direction', draft: true,
+  { n: 4, key: 'a2', area: 'Expressive vocabulary', draft: true, input: 'count',
+    show: 'The Big 5 cards, one at a time', say: '“What is this word?”',
+    rule: '1 point if the student names, signs or otherwise communicates at least 3 of the 5 words.',
+    mat: ['help', 'do', 'see', 'go', 'stop'] },
+  { n: 5, key: 'a3', area: 'Two-step direction', draft: true, input: 'steps',
     show: 'Help and stop cards, with the First/Next cards', say: '“First touch HELP. Next, give me STOP.”',
-    rubric: ['No response', 'One step', 'Both steps, out of order or after a repeat', 'Both steps, in order, the first time'],
+    rule: '1 point if the student completes both steps, in order.',
     mat: ['help', 'stop'] },
-  { n: 4, key: 'a4', area: 'Target sound', draft: true,
-    show: 'Help and see cards', say: '“Which one starts with /h/?”',
-    rubric: ['No response', 'Chooses, but not the right card', 'Correct after the sound is repeated', 'Correct the first time'],
-    mat: ['help', 'see'] },
-  { n: 5, key: 'a5', area: 'Anchor sentence', draft: true,
+  { n: 6, key: 'a4', area: 'Target sound', draft: true, input: 'sound',
+    show: 'Help card', say: '“Say /h/… help.”',
+    rule: '1 point if the student produces the target sound correctly.',
+    mat: ['help'] },
+  { n: 7, key: 'a5', area: 'Anchor sentence', draft: true, input: 'anchor',
     show: '“We help.” anchor card', say: '“Your turn: say our sentence.”',
-    rubric: ['No response', 'Echoes after a model', 'Gives part of it alone (“help”)', 'Gives “We help!” alone'],
+    rule: '1 point if the student communicates “We help.” (both words, any mode).',
     mat: ['anchor'] },
-  { n: 'bonus', key: 'bonus', area: 'Sentence frame (bonus)', draft: true, optional: true,
+  { n: 8, key: 'bonus', area: 'Bonus (not scored)', draft: true, optional: true, input: 'bonus',
     show: 'Teacher picture. Only if the student is clearly ready', say: '“I see a ___.”',
-    rubric: ['No response', 'Gives one word', 'Completes the frame after a model', 'Gives the full frame alone'],
+    rule: 'No points. Never added to the total.',
     mat: ['teacher'] }
 ];
 
